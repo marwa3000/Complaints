@@ -1,39 +1,42 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
 
 st.title("نظام إدارة الشكاوى 📋")
 
-# إدخال البيانات
 complaint_id = st.text_input("رقم الشكوى")
 product = st.text_input("اسم المنتج")
 severity = st.selectbox("درجة الخطورة", ["High", "Medium", "Low"])
 details = st.text_area("تفاصيل الشكوى")
 
-# زر الحفظ
 if st.button("حفظ الشكوى"):
-    new_data = {
-        "Complaint ID": [complaint_id],
-        "Product": [product],
-        "Severity": [severity],
-        "Details": [details],
-        "Date": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
-    }
-    new_df = pd.DataFrame(new_data)
+    new_data = [
+        complaint_id,
+        product,
+        severity,
+        details,
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ]
 
-    try:
-        existing_df = pd.read_excel("complaints_database.xlsx")
-        updated_df = pd.concat([existing_df, new_df], ignore_index=True)
-    except FileNotFoundError:
-        updated_df = new_df
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
+    client = gspread.authorize(creds)
 
-    updated_df.to_excel("complaints_database.xlsx", index=False)
-    st.success("تم حفظ الشكوى بنجاح!")
+    # افتحي الملف "Complaints Database" اللي عملتيه في Google Sheets
+    sheet = client.open("Complaints Database").sheet1
+    sheet.append_row(new_data)
 
-# زر لعرض الشكاوى
-if st.button("عرض جميع الشكاوى"):
-    try:
-        df = pd.read_excel("complaints_database.xlsx")
-        st.write(df)
-    except:
-        st.warning("لا توجد شكاوى لعرضها حاليًا.")
+    st.success("✅ تم حفظ الشكوى بنجاح في Google Sheets!")
+
+if st.button("عرض كل الشكاوى"):
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
+    client = gspread.authorize(creds)
+    
+    sheet = client.open("Complaints Database").sheet1
+    data = sheet.get_all_records()
+
+    df = pd.DataFrame(data)
+    st.write(df)
